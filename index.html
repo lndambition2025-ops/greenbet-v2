@@ -3,36 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GreenBet Pro - Live Data</title>
+    <title>GreenBet Pro - Direct</title>
     <style>
-        :root { --primary: #27ae60; --dark: #2c3e50; --bg: #f4f7f6; }
-        body { background: var(--bg); color: var(--dark); font-family: sans-serif; margin: 0; padding-bottom: 50px; }
-        header { background: white; padding: 20px; text-align: center; border-bottom: 3px solid var(--primary); box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        :root { --primary: #27ae60; --dark: #1e272e; --bg: #f1f2f6; }
+        body { background: var(--bg); font-family: -apple-system, sans-serif; margin: 0; padding-bottom: 50px; }
+        header { background: white; padding: 15px; text-align: center; border-bottom: 3px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .market-nav { display: flex; gap: 8px; overflow-x: auto; padding: 10px; background: white; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #ddd; }
-        .btn { background: #eee; border: none; padding: 8px 15px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; cursor: pointer; white-space: nowrap; }
+        .btn { background: #f1f2f6; border: none; padding: 8px 15px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; cursor: pointer; white-space: nowrap; color: #57606f; }
         .btn.active { background: var(--primary); color: white; }
-        .container { padding: 15px; max-width: 600px; margin: auto; }
-        .league-title { background: var(--dark); color: white; padding: 10px; border-radius: 6px; margin: 20px 0 10px 0; font-size: 0.8rem; font-weight: bold; display: flex; justify-content: space-between; }
-        .match-card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 5px solid #ddd; }
-        .match-card.live { border-left-color: var(--primary); }
-        .teams { display: flex; justify-content: space-between; font-weight: bold; font-size: 0.95rem; margin-bottom: 10px; }
-        .prono { background: #f0fff4; border: 1px solid #dcfce7; padding: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .tip { color: var(--primary); font-weight: 900; }
-        .conf { font-size: 0.8rem; font-weight: bold; color: #27ae60; }
-        .status-tag { font-size: 0.6rem; background: #eee; padding: 2px 5px; border-radius: 4px; color: #666; }
+        .container { padding: 12px; max-width: 600px; margin: auto; }
+        .league-title { background: var(--dark); color: white; padding: 8px 12px; border-radius: 6px; margin: 20px 0 10px 0; font-size: 0.8rem; font-weight: 800; }
+        .match-card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .teams { display: flex; justify-content: space-between; font-weight: bold; font-size: 1rem; margin-bottom: 10px; }
+        .prono-box { background: #fafffd; border: 1px solid #dcfce7; padding: 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .tip-txt { color: var(--primary); font-weight: 900; font-size: 1rem; }
+        .conf-val { font-size: 0.8rem; font-weight: bold; color: #27ae60; background: #eafaf1; padding: 2px 6px; border-radius: 4px; }
+        .info-bar { font-size: 0.65rem; text-align: center; padding: 10px; color: #ffa502; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <header>
-        <div style="font-size: 1.5rem; font-weight: 900; color: var(--primary);">GREENBET PRO ⚽</div>
-        <div id="api-status" style="font-size: 0.6rem; color: orange; font-weight: bold; margin-top: 5px;">CHARGEMENT DES VRAIS MATCHS...</div>
-    </header>
+    <header><div style="font-size: 1.4rem; font-weight: 900; color: var(--primary);">GREENBET PRO ⚽</div></header>
+
+    <div class="info-bar" id="status">RECHERCHE DES MATCHS RÉELS...</div>
 
     <div class="market-nav">
         <button class="btn active" onclick="setM('WIN', this)">🏆 Résultat</button>
         <button class="btn" onclick="setM('GOALS', this)">⚽ +2.5 Buts</button>
-        <button class="btn" onclick="setM('BTTS', this)">🔥 Les 2 marquent</button>
+        <button class="btn" onclick="setM('BTTS', this)">🔥 BTTS (2 marquent)</button>
     </div>
 
     <div class="container" id="app"></div>
@@ -40,34 +38,33 @@
     <script>
         const API_KEY = '8997f37435f3484f885f00e57204481c';
         let market = 'WIN';
-        let dataStore = {
-            "MATCHS DU JOUR (BETA)": [
-                {id: 101, homeTeam:{name:"Lyon"}, awayTeam:{name:"Lille"}, isTest: true},
-                {id: 102, homeTeam:{name:"Liverpool"}, awayTeam:{name:"Newcastle"}, isTest: true},
-                {id: 103, homeTeam:{name:"Real Madrid"}, awayTeam:{name:"Seville"}, isTest: true}
-            ]
-        };
+        let allMatches = [];
 
-        async function fetchRealMatches() {
-            const leagues = {'FL1':'Ligue 1', 'PL':'Premier League', 'PD':'La Liga', 'SA':'Serie A', 'BL1':'Bundesliga'};
-            let foundAny = false;
-
-            for (const code in leagues) {
-                try {
-                    const res = await fetch(`https://api.football-data.org/v4/competitions/${code}/matches?status=SCHEDULED`, {
-                        headers: { 'X-Auth-Token': API_KEY }
-                    });
-                    const data = await res.json();
-                    
-                    if (data.matches && data.matches.length > 0) {
-                        if (!foundAny) { dataStore = {}; foundAny = true; } // Efface les tests dès qu'on a du vrai
-                        dataStore[leagues[code]] = data.matches.slice(0, 10);
-                        document.getElementById('api-status').innerText = "VRAIS MATCHS CONNECTÉS ✅";
-                        document.getElementById('api-status').style.color = "green";
-                        render();
-                    }
-                } catch (e) { console.error("Erreur ligue " + code); }
-                await new Promise(r => setTimeout(r, 1200)); // Pause obligatoire pour l'API gratuite
+        async function loadData() {
+            const status = document.getElementById('status');
+            try {
+                // ON DEMANDE TOUS LES MATCHS DU JOUR EN UN SEUL APPEL
+                const res = await fetch('https://api.football-data.org/v4/matches', {
+                    headers: { 'X-Auth-Token': API_KEY }
+                });
+                const data = await res.json();
+                
+                if (data.matches && data.matches.length > 0) {
+                    allMatches = data.matches;
+                    status.innerText = "CONNEXION RÉUSSIE ✅ " + allMatches.length + " MATCHS TROUVÉS";
+                    status.style.color = "#27ae60";
+                    render();
+                } else {
+                    throw new Error("Pas de matchs");
+                }
+            } catch (e) {
+                status.innerText = "MODE DÉMO (API saturée, réessayez plus tard)";
+                allMatches = [
+                    { competition: {name: "Ligue 1 🇫🇷"}, id:1, homeTeam:{name:"Lyon"}, awayTeam:{name:"Lille"}},
+                    { competition: {name: "Premier League 🏴󠁧󠁢󠁥󠁮󠁧󠁿"}, id:2, homeTeam:{name:"Liverpool"}, awayTeam:{name:"Newcastle"}},
+                    { competition: {name: "La Liga 🇪🇸"}, id:3, homeTeam:{name:"Real Madrid"}, awayTeam:{name:"Seville"}}
+                ];
+                render();
             }
         }
 
@@ -81,15 +78,23 @@
         function render() {
             const app = document.getElementById('app');
             app.innerHTML = '';
-            for (const league in dataStore) {
-                let html = `<div class="league-title">${league.toUpperCase()} <span>${dataStore[league].length}</span></div>`;
-                dataStore[league].forEach(m => {
+            
+            // On groupe par championnat
+            const groups = {};
+            allMatches.forEach(m => {
+                const name = m.competition.name;
+                if (!groups[name]) groups[name] = [];
+                groups[name].push(m);
+            });
+
+            for (const league in groups) {
+                let html = `<div class="league-title">${league.toUpperCase()}</div>`;
+                groups[league].forEach(m => {
                     const p = getP(m);
                     html += `
-                    <div class="match-card ${m.isTest ? '' : 'live'}">
-                        <div style="margin-bottom: 5px;"><span class="status-tag">${m.isTest ? 'PRÉVISION' : 'DIRECT API'}</span></div>
+                    <div class="match-card">
                         <div class="teams"><span>${m.homeTeam.name}</span> <span style="color:#ccc">vs</span> <span>${m.awayTeam.name}</span></div>
-                        <div class="prono"><span class="tip">${p.t}</span> <span class="conf">${p.c}% 🔥</span></div>
+                        <div class="prono-box"><span class="tip-txt">${p.t}</span> <span class="conf-val">${p.c}%</span></div>
                     </div>`;
                 });
                 app.innerHTML += html;
@@ -103,8 +108,7 @@
             return {t: s % 5 > 2 ? "BTTS : OUI" : "BTTS : NON", c: 55 + (s % 20)};
         }
 
-        render(); // Affiche les tests de suite
-        fetchRealMatches(); // Charge les vrais en fond
+        loadData();
     </script>
 </body>
 </html>
